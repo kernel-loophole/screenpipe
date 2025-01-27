@@ -122,9 +122,10 @@ pub async fn get_device_and_config(
     let host = cpal::default_host();
 
     let is_output_device = audio_device.device_type == DeviceType::Output;
-    let is_display = audio_device.to_string().contains("Display");
+    let is_headphone_or_airpods = audio_device.name.to_lowercase().contains("headphone")
+        || audio_device.name.to_lowercase().contains("airpods");
 
-    let cpal_audio_device = if audio_device.to_string() == "default" {
+    let cal_audio_device = if audio_device.to_string() == "default" {
         match audio_device.device_type {
             DeviceType::Input => host.default_input_device(),
             DeviceType::Output => host.default_output_device(),
@@ -157,17 +158,19 @@ pub async fn get_device_and_config(
                 .unwrap_or(false)
         })
     }
-    .ok_or_else(|| anyhow!("Audio device not found"))?;
+        .ok_or_else(|| anyhow!("Audio device not found"))?;
 
-    // if output device and windows, using output config
-    let config = if is_output_device && !is_display {
-        cpal_audio_device.default_output_config()?
+    // If the device is a headphone or AirPods, use the input config
+    let config = if is_headphone_or_airpods {
+        cal_audio_device.default_input_config()?
+    } else if is_output_device {
+        cal_audio_device.default_output_config()?
     } else {
-        cpal_audio_device.default_input_config()?
+        cal_audio_device.default_input_config()?
     };
-    Ok((cpal_audio_device, config))
-}
 
+    Ok((cal_audio_device, config))
+}
 pub async fn record_and_transcribe(
     audio_stream: Arc<AudioStream>,
     duration: Duration,
